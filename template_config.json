@@ -1,0 +1,6 @@
+{
+	"host":"RABBITMQ_HOST",
+	"login":"USER",
+	"password": "PASSWORD"
+}
+

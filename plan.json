@@ -1,0 +1,33 @@
+[
+  {
+    "events": [
+      {
+        "name": "emergency",
+        "from": "PKEY",
+        "t1": "TIME",
+        "t2": "TIME",
+        "carryDataType": "boolean"
+      }
+      ],
+    "actions": [
+      {
+        "function": "copy",
+        "parameters": {
+          "from": "ADDRESS",
+          "to": "ADDRESS",
+          "dataset": "ID",
+          "service": "HTTP",
+          "callback": "URL"
+        },
+		"resolve": {
+			"events": [
+				{
+					"name": "emergency_data_copied",
+					"carryDataType": "object"
+				}
+			]
+		}
+      }
+      ]
+  }
+  ]

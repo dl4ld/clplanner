@@ -1,0 +1,47 @@
+---
+table:
+   AuditorA: YAkJunLY0Pv3AjZHD++blx5PKOYydceseKmejkQqCGA=
+   EventA: Y6kVMKeW16Q8oNCGqlfCr12w5jaIzaJeoC+vfZIvb24=
+   BucketA: GMpLkzapjAZTy/ggQju8PE4UjvmZmD30ZwICPB706d0=
+   BucketB: tYsxMWCUQxpgfz+uVZk/WBC+/clQQevcrckBohUK14U=
+   Data001: somehash
+    
+actions:
+  - on: "{{EventA}}.e.codeRed || ({{EventA}}.e.codeOrange && {{EventA}}.e.codeYellow)"
+    name: action1
+    resetAfter: 30
+    do: 
+     - function: "{{AuditorA}}.f.sign"
+       params:
+           actionOnSource: send
+           actionOnDestination: receive
+           sourceActor: "{{BucketA}}"
+           destinationActor: "{{BucketB}}"
+           dataset: "{{Data001}}"
+       successEvent: "{{me}}.e.signA"
+       returnId: tokenA
+       rejectEvent: "{{me}}.e.error"
+  - on: "{{me}}.e.signA"
+    resetAfter: 30
+    name: copy1
+    do: 
+     - function: "{{BucketA}}.f.send"
+       params:
+           remoteCall: "{{BucketB}}.f.receive"
+           dataset: "{{Data001}}"
+           token: "{{tokenA}}"
+       successEvent: "{{me}}.e.copy1"
+       returnId: resultCopy1
+       rejectEvent: "{{me}}.e.error"
+  - on: "{{me}}.e.copy1"
+    name: result1
+    resetAfter: 30
+    do:
+     - function: "{{me}}.f.handleResult"
+       params:
+          result: "{{resultCopy1}}"
+       successEvent: null
+       returnId: null
+       rejectEvent: null
+
+   
