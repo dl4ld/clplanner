@@ -1,6 +1,19 @@
 {
-	"host":"RABBITMQ_HOST",
-	"login":"USER",
-	"password": "PASSWORD"
+	"name": "plannerA",
+	"type": "planner",
+	"domain": "ADDRESS_OF_CLDOMAIN_ACTOR",
+	"redis": {
+		"host": "172.17.0.2",
+		"port": 6379
+	},
+	"rabbit":{
+		"host":"HOST",
+		"login":"USER",
+		"password": "PASSWORD"
+	},
+	"keysB64":	{ 
+		"publicKey": "PUBLIC_KEY",
+		"privateKey": "PRIVATE_KEY" 
+	}
 }
 

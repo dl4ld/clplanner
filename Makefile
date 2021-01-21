@@ -1,5 +1,5 @@
 .PHONY: all
-CONFIGPATH = $(shell realpath ../configs)
+CONFIGPATH = $(shell realpath ${config})
 
 build:
 	docker build -t dl4ld/clplanner .
