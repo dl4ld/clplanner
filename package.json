@@ -13,8 +13,7 @@
     "command-line-args": "^5.1.1",
     "randomstring": "^1.1.5",
     "redis": "^3.0.2",
-    "registry": "git+https://github.com/dl4ld/cllibregistry.git#0.0.3",
-    "secureamqp": "git+https://github.com/dl4ld/cllibsecureamqp.git#0.0.2",
+    "secureamqp": "git+https://github.com/dl4ld/cllibsecureamqp.git",
     "yaml": "^1.10.0"
   }
 }

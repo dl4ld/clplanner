@@ -1,17 +1,12 @@
 .PHONY: all
-
-
-CONFIG = $(shell cat config.json | base64 | tr -d '\n')
-
-test:
-	echo ${CONFIG}
+CONFIGPATH = $(shell realpath ../configs)
 
 build:
-	docker build -t dl4ld/clactor .
+	docker build -t dl4ld/clplanner .
 
 run: build
-	docker run -it -e CONFIG=${CONFIG} dl4ld/clactor /bin/sh
+	docker run -it -v ${CONFIGPATH}:/mnt dl4ld/clplanner /bin/sh
 
 push: build
-	docker push dl4ld/clactor:latest
+	docker push dl4ld/clplanner:latest
 

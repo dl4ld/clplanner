@@ -3,7 +3,8 @@ const fs = require('fs')
 const YAML = require('yaml')
 const parserEventNames = require("./parsers/event_names").parser;
 const parserEventExpr = require("./parsers/event_expr").parser;
-const secureAmqp = require('../cllibsecureamqp')
+//const secureAmqp = require('../cllibsecureamqp')
+const secureAmqp = require('secureamqp')
 
 const cmdOptions = [
 	{ name: 'send', alias: 's', type: String},
@@ -18,7 +19,7 @@ const events = {}
 
 const _plan = (() => {
 	if(options.plan) {
-		const file = fs.readFileSync('./' + options.plan, 'utf8')
+		const file = fs.readFileSync(options.plan, 'utf8')
 		const p = YAML.parse(file)
 		return p
 	} else return {}
@@ -59,7 +60,6 @@ function parsePlan(p) {
 			.parse(expandedExpr)
 			.split(',')
 			.forEach(e => {
-				console.log("E: ",e)
 				events[e] = e
 				listeners[e] = {
 					name: a.name,
@@ -95,11 +95,10 @@ function newEvent(e) {
 	plan.triggers[e.name] = true
 	if(l) {
 		console.log("Fired event: ", e.name)
-		console.log("Expr: ", l.expr)
 		const ev = eval(l.expr)
 		if(ev === true) {
 			const action = plan.actions[l.name]
-			console.log(action.on + " is true.")
+			console.log(action.on + " evaluates to true.")
 			if(!action.fired) {
 				action.fired = true
 				action.firedAt = new Date().toISOString()
@@ -133,7 +132,6 @@ function runAction(action) {
 			// do stuff
 			// emit event that function is ready
 			const successEvent = replace(t.successEvent, plan.table)
-			console.log("Succ: ", successEvent)
 			secureAmqp.emitEvent(successEvent, "boolean", "true", null)
 		})
 	})
@@ -153,11 +151,11 @@ async function main() {
 	plan = parsePlan(_plan)
 
 	secureAmqp.registerFunction('.f.handleResult', null, function(req, res) {
-		console.log("in handleResult: ", req.msg)
+		console.log("Function handleResult called: ", req.msg)
 	})
 
 	Object.keys(plan.events).forEach(k => {
-		console.log("Subscribing to: ", k)
+		console.log("Subscribing to event: ", k)
 		secureAmqp.subscribeEvent(k, function(e) {
 			newEvent(e)
 		})
