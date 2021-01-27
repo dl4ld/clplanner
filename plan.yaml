@@ -7,8 +7,10 @@ table:
    Data001: somehash
     
 actions:
-  - on: "{{EventA}}.e.codeRed || ({{EventA}}.e.codeOrange && {{EventA}}.e.codeYellow)"
+    # on: "{{EventA}}.e.codeRed || ({{EventA}}.e.codeOrange && {{EventA}}.e.codeYellow)"
+  - on: "({{EventA}}.e.codeOrange && {{EventA}}.e.codeYellow)"
     name: action1
+    timeWindow: 5
     resetAfter: 30
     do: 
      - function: "{{AuditorA}}.f.sign"

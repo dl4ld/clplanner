@@ -93,6 +93,14 @@ function newEvent(event) {
 			return false
 		}
 	}*/
+	
+
+	function evaluate(expr) {
+		const e = plan.triggers
+		let ev = false
+		eval("ev = (" + expr + ") ? true : false")
+		return ev
+	}
 
 	function typedEvent(ev) {
 		if(ev.type == "boolean")
@@ -102,7 +110,6 @@ function newEvent(event) {
 		return ev.value
 	}
 
-	const e = plan.triggers
 
 	console.log("Received event: ", event)
 	const l = plan.listeners[event.name]
@@ -112,22 +119,35 @@ function newEvent(event) {
 	}
 
 	if(l) {
-		console.log("E: ", e[event.name])
+		const action = plan.actions[l.name]
 		console.log("Fired event: ", event.name)
-		console.log("Expr: ", l.expr)
-		let ev
-		console.log("EV: ", ev)
-		eval("ev = (" + l.expr + ") ? true : false")
-		console.log("EV: ", ev)
-		if(ev === true) {
-			const action = plan.actions[l.name]
+		if(!action.startWindow) {
+			action.startWindow = new Date().getTime()
+			if(!action.timeWindow) {
+				action.timeWindow = 60
+			}
+		}
+
+	//	let ev
+	//	eval("ev = (" + l.expr + ") ? true : false")
+	//	console.log("EV: ", ev)
+		if(evaluate(l.expr)) {
 			console.log(action.on + " evaluates to true.")
+			const t1 = new Date().getTime()
+			const tDiff = t1 - action.startWindow
+			if(tDiff > (action.timeWindow * 1000)) {
+				console.log("Time window expired for event.")
+				action.startWindow = null
+				return
+			}
+
 			if(!action.fired) {
 				action.fired = true
 				action.firedAt = new Date().toISOString()
 				setTimeout(() => {
 					// reset fired action
 					action.fired = false
+					action.startWindow = null
 				}, action.resetAfter * 1000)
 				// run actions
 				runAction(action)
