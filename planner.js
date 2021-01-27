@@ -61,6 +61,10 @@ function parsePlan(p) {
 			.split(',')
 			.forEach(e => {
 				events[e] = e
+				triggers[e] = {
+					type: null,
+					value: null
+				}
 				listeners[e] = {
 					name: a.name,
 					expr: eventExpr
@@ -78,8 +82,8 @@ function parsePlan(p) {
 
 let plan
 
-function newEvent(e) {
-	function f(e) {
+function newEvent(event) {
+	/*function f(e) {
 		if(typeof e === "boolean") {
 			return e
 		}
@@ -88,14 +92,33 @@ function newEvent(e) {
 		} else {
 			return false
 		}
+	}*/
+
+	function typedEvent(ev) {
+		if(ev.type == "boolean")
+			return (ev.value === "true")
+		if(ev.type == "number")
+			return Number(ev.value)
+		return ev.value
 	}
 
-	console.log("Received event: ", e)
-	const l = plan.listeners[e.name]
-	plan.triggers[e.name] = true
+	const e = plan.triggers
+
+	console.log("Received event: ", event)
+	const l = plan.listeners[event.name]
+	plan.triggers[event.name] = {
+		value: typedEvent(event),
+		type: event.type
+	}
+
 	if(l) {
-		console.log("Fired event: ", e.name)
-		const ev = eval(l.expr)
+		console.log("E: ", e[event.name])
+		console.log("Fired event: ", event.name)
+		console.log("Expr: ", l.expr)
+		let ev
+		console.log("EV: ", ev)
+		eval("ev = (" + l.expr + ") ? true : false")
+		console.log("EV: ", ev)
 		if(ev === true) {
 			const action = plan.actions[l.name]
 			console.log(action.on + " evaluates to true.")
@@ -140,7 +163,9 @@ function runAction(action) {
 function debug() {
 	console.log("Debug.......");
 	newEvent({
-		name: "Y6kVMKeW16Q8oNCGqlfCr12w5jaIzaJeoC+vfZIvb24=.e.codeRed"
+		name: "Y6kVMKeW16Q8oNCGqlfCr12w5jaIzaJeoC+vfZIvb24=.e.codeRed",
+		value: true,
+		type: "boolean"
 	})
 }
 
@@ -149,6 +174,8 @@ async function main() {
 	const myAddress = secureAmqp.getMyAddress()
 	console.log("Actor address: ", myAddress)
 	plan = parsePlan(_plan)
+
+	//debug()
 
 	secureAmqp.registerFunction('.f.handleResult', null, function(req, res) {
 		console.log("Function handleResult called: ", req.msg)
