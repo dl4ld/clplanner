@@ -6,18 +6,22 @@
 %%
 
 \s+                   /* skip whitespace */
-[a-zA-Z.+/]+[a-zA-Z0-9=.+/]+	  return 'EVENTNAME'
-[0-9]+				  return 'NUMBER'
+E\.[a-zA-Z0-9=.+/]+	  return 'EVENTNAME'
+[+-]?([0-9]*[.])?[0-9]+     return 'NUMBER'
 "||"                  return '||'
 "&&"                  return '&&'
 "!"                   return '!'
-"=="                   return '=='
-">="                   return '>='
-"<="                   return '<='
+"=="                  return '=='
+"<>"				  return '<>'
+">="                  return '>='
+"<="                  return '<='
 "<"                   return '<'
 ">"                   return '>'
 "("                   return '('
 ")"                   return ')'
+"["                   return '['
+"]"                   return ']'
+"..."                 return '...'
 <<EOF>>               return 'EOF'
 .                     return 'INVALID'
 
@@ -26,7 +30,7 @@
 /* operator associations and precedence */
 
 %left '||' '&&'
-%left '==' '>' '<' '>=' '<='
+%left '<>' '==' '>' '<' '>=' '<='
 %right '!'
 
 %start expressions
@@ -52,6 +56,11 @@ COMP
 		{$$ = yytext;}
 	;
 
+EV
+    : EVENTNAME
+         {$$ = yytext.substring(2, yytext.lenght);}
+	;
+
 e
     : e '&&' e
         {$$ = $1 + '&&' + $3;}
@@ -61,9 +70,11 @@ e
         {$$ = '! ' + $2;}
     | '(' e ')'
         {$$ = '(' + $2 +')';}
-	| EVENTNAME COMP NUMBER
+	| EV '<>' '[' NUMBER '...' NUMBER ']'
+        {$$ = '(e["' + $1 + '"].value > '+ $4 + ' && e["' + $1 + '"].value < ' + $6 + ')';}
+	| EV COMP NUMBER
         {$$ = 'e["' + $1 + '"].value '+ $2 + $3;}
-    | EVENTNAME 
-        {$$ = 'e["'+yytext+'"].value == true';}
+    | EV
+        {$$ = 'e["'+$1+'"].value';}
     ;
 

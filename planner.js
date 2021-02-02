@@ -3,8 +3,9 @@ const fs = require('fs')
 const YAML = require('yaml')
 const parserEventNames = require("./parsers/event_names").parser;
 const parserEventExpr = require("./parsers/event_expr").parser;
-//const secureAmqp = require('../cllibsecureamqp')
-const secureAmqp = require('secureamqp')
+const parserSymbols = require("./parsers/symbols").parser;
+const secureAmqp = require('../cllibsecureamqp')
+//const secureAmqp = require('secureamqp')
 
 const cmdOptions = [
 	{ name: 'send', alias: 's', type: String},
@@ -25,21 +26,66 @@ const _plan = (() => {
 	} else return {}
 })()
 
+
 function replace(s, t) {
+	console.log("Replacing: ", s)
+	if(s.indexOf('{{') == -1) {
+		return s
+	}
+	function tr(k) {
+		if(t[k]) {
+			return t[k]
+		} else {
+			return k
+		}
+	}
+	const subSub = parserSymbols.parse(s)
+	console.log(subSub)
+	const x = eval(subSub)
+	return x
+}
+
+function replaceExpr(s, t) {
+	console.log("Start replace of: ", s)
+	const dict = {}
+	const eventCsv = parserEventNames
+		.parse(s)
+		.split(',')
+		.forEach(e => {
+			const x = replace(e,t)
+			dict[e] = x
+		})
+
+	let subStr = s
+	Object.keys(dict).forEach(k => {
+		subStr = subStr.replace(k, dict[k])
+	})
+	return subStr
+}
+
+
+/*function _replace_(s, t) {
+	console.log("Starting replace: ", s)
+	const subStr = dig(s, t)
+	console.log("Replace " + s + " with " + subStr)
+	return subStr
+
+	function dig(s, t){
 		const re = new RegExp('{{(.*?)}}')
 		const r = s.match(re)
 		if(r) {
 			if(t[r[1]]){
 				let ns = s.replace(r[0], t[r[1]])
-				return replace(ns, t)
+				return dig(ns, t)
 			} else {
 				let ns = s.replace(r[0], "None")
-				return replace(ns, t)
+				return dig(ns, t)
 			}
 		} else {
 			return s
 		}
-}
+	}
+}*/
 
 function parsePlan(p) {
 	const table = p.table
@@ -54,12 +100,14 @@ function parsePlan(p) {
 		a.fired = false
 		a.firedAt = null
 		actions[a.name] = a
-		const expandedExpr = replace(a.on, table)
+		const expandedExpr = replaceExpr(a.on, table)
+		console.log("Expanded expr: ", expandedExpr)
 		const eventExpr = parserEventExpr.parse(expandedExpr)
 		const eventCsv = parserEventNames
 			.parse(expandedExpr)
 			.split(',')
-			.forEach(e => {
+			.forEach(ee => {
+				e = ee.substr(2, ee.lenght)
 				events[e] = e
 				triggers[e] = {
 					type: null,
@@ -82,20 +130,17 @@ function parsePlan(p) {
 
 let plan
 
+function addToTable(k, v, t) {
+	console.log("Adding to table: ", { key: k, value: v})
+	t[k] = v
+}
+
 function newEvent(event) {
-	/*function f(e) {
-		if(typeof e === "boolean") {
-			return e
-		}
-		if(plan.triggers[e]) {
-			return true
-		} else {
-			return false
-		}
-	}*/
-	
+	console.log("New event: ", event)
+	addToTable(event.name + ".value", event.value, plan.table) 
 
 	function evaluate(expr) {
+		console.log("Evaluating expr: ", expr)
 		const e = plan.triggers
 		let ev = false
 		eval("ev = (" + expr + ") ? true : false")
@@ -110,8 +155,6 @@ function newEvent(event) {
 		return ev.value
 	}
 
-
-	console.log("Received event: ", event)
 	const l = plan.listeners[event.name]
 	plan.triggers[event.name] = {
 		value: typedEvent(event),
@@ -128,9 +171,6 @@ function newEvent(event) {
 			}
 		}
 
-	//	let ev
-	//	eval("ev = (" + l.expr + ") ? true : false")
-	//	console.log("EV: ", ev)
 		if(evaluate(l.expr)) {
 			console.log(action.on + " evaluates to true.")
 			const t1 = new Date().getTime()
@@ -140,7 +180,6 @@ function newEvent(event) {
 				action.startWindow = null
 				return
 			}
-
 			if(!action.fired) {
 				action.fired = true
 				action.firedAt = new Date().toISOString()
@@ -162,20 +201,27 @@ function runAction(action) {
 		const f = replace(t.function, plan.table).split('.')
 		const d = f[0]
 		const fname = '.' + f[1] +'.' + f[2]
+		t.newParams = {}
 		Object.keys(t.params).forEach(k => {
 			let v = t.params[k]
-			v = replace(v, plan.table)
-			t.params[k] = v
+			console.log("VV: ", v)
+			t.newParams[k] = replace(v, plan.table)
+			//t.params[k] = v
+			console.log("Param: " + k + " = " + v)
 		})
 		console.log("Calling function: " + d + fname)
-		secureAmqp.callFunction(d, fname, t.params, null, function(res) {
+		secureAmqp.callFunction(d, fname, t.newParams, null, function(res) {
 			console.log("Fucntion: " + fname + " returned.")
 			const result = res.msg
-			plan.table[t.returnId] = result
-			// do stuff
-			// emit event that function is ready
-			const successEvent = replace(t.successEvent, plan.table)
-			secureAmqp.emitEvent(successEvent, "boolean", "true", null)
+			addToTable(t.return.ref, result.response, plan.table)
+			t.return['200'].forEach(ret => {
+
+				const eventName = replace(ret.eventName, plan.table)
+				const eventType = ret.eventType || "String"
+				const eventValue = replace(ret.eventValue, plan.table)
+				console.log("Emit: ", eventName)	
+				secureAmqp.emitEvent(eventName, eventType, eventValue, null)
+			})
 		})
 	})
 }
@@ -195,10 +241,10 @@ async function main() {
 	console.log("Actor address: ", myAddress)
 	plan = parsePlan(_plan)
 
-	//debug()
+//	debug()
 
 	secureAmqp.registerFunction('.f.handleResult', null, function(req, res) {
-		console.log("Function handleResult called: ", req.msg)
+		console.log("Function handleResult called: ", JSON.stringify(req.msg))
 	})
 
 	Object.keys(plan.events).forEach(k => {

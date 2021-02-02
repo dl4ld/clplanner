@@ -5,28 +5,32 @@
 %lex
 %%
 
-\s+                   /* skip whitespace */
-[a-zA-Z.+/]+[a-zA-Z0-9.+/=]+	  return 'EVENTNAME'
-[0-9]+				  return 'NUMBER'
-"||"                  return '||'
-"&&"                  return '&&'
-"!"                   return '!'
-"=="                   return '=='
-">="                   return '>='
-"<="                   return '<='
-"<"                   return '<'
-">"                   return '>'
-"("                   return '('
-")"                   return ')'
-<<EOF>>               return 'EOF'
-.                     return 'INVALID'
+\s+							/* skip whitespace */
+E\.[a-zA-Z0-9{}.+/=]+		return 'EVENTNAME'
+[+-]?([0-9]*[.])?[0-9]+     return 'NUMBER'
+"||"						return '||'
+"&&"						return '&&'
+"!"							return '!'
+"=="						return '=='
+"<>"						return '<>'
+">="						return '>='
+"<="						return '<='
+"<"							return '<'
+">"							return '>'
+"("							return '('
+")"							return ')'
+"["							return '['
+"]"							return ']'
+"..."							return '...'
+<<EOF>>						return 'EOF'
+.							return 'INVALID'
 
 /lex
 
 /* operator associations and precedence */
 
 %left '||' '&&'
-%left '==' '>' '<' '>=' '<='
+%left '<>' '==' '>' '<' '>=' '<='
 %right '!'
 
 %start expressions
@@ -62,6 +66,8 @@ e
     | '(' e ')'
         {$$ = $2;}
 	| EVENTNAME COMP NUMBER
+        {$$ = $1;}
+	| EVENTNAME '<>' '[' NUMBER '...' NUMBER ']'
         {$$ = $1;}
     | EVENTNAME
         {$$ = yytext;}
