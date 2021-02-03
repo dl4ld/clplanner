@@ -25,17 +25,18 @@ actions:
            dataset: "{{Data001}}"
        return:
            ref: tokenA
-           200:
-             - eventName: "{{me}}.e.signA"
-               eventType: "String"
-               eventValue: "{{tokenA}}"
-             - eventName: "{{me}}.e.counter"
-               eventType: "Number"
-               eventValue: "{{C}}"
-           400:
-               eventName: "{{me}}.e.error"
-               eventType: "Object"
-               eventValue: "{{tokenA}}"
+           codes:
+               200:
+                - eventName: "{{me}}.e.signA"
+                  eventType: "String"
+                  eventValue: "{{tokenA}}"
+                - eventName: "{{me}}.e.counter"
+                  eventType: "Number"
+                  eventValue: "{{C}}"
+               400:
+                - eventName: "{{me}}.e.error"
+                  eventType: "String"
+                  eventValue: "Error from function {{AuditorA}}.f.sign"
   - on: "E.{{me}}.e.counter > 0"
     resetAfter: 0
     name: counter1
@@ -46,12 +47,11 @@ actions:
            counter: "{{{{me}}.e.counter.value}}"
        return:
            ref: counterA
-           200:
-             - eventName: "{{me}}.e.counter"
-               eventType: "Number"
-               eventValue: "{{counterA}}"
-           400:
-             eventName: "{{me}}.e.error"
+           codes:
+               200:
+                 - eventName: "{{me}}.e.counter"
+                   eventType: "Number"
+                   eventValue: "{{counterA}}"
   - on: "E.{{me}}.e.signA"
     resetAfter: 30
     name: copy1
@@ -63,22 +63,18 @@ actions:
            token: "{{{{me}}.e.signA.value}}"
        return:
            ref: resultCopy1
-           200:
-            - eventName: "{{me}}.e.copy1"
-              eventType: "String"
-              eventValue: "{{resultCopy1}}"
-           400:
-             eventName: "{{me}}.e.error"
-  - on: "E.{{me}}.e.copy1"
+           codes:
+               200:
+                - eventName: "{{me}}.e.copy1"
+                  eventType: "String"
+                  eventValue: "{{resultCopy1}}"
+  - on: "E.{{me}}.e.copy1 && (E.{{me}}.e.counter == 0)"
     name: result1
     resetAfter: 30
     do:
      - function: "{{me}}.f.handleResult"
        params:
           result: "{{resultCopy1}}"
-       result: 
-          ref: "None"
-          200: []
-          400: []
+       result: null
 
    
