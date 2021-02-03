@@ -4,6 +4,7 @@ const YAML = require('yaml')
 const parserEventNames = require("./parsers/event_names").parser;
 const parserEventExpr = require("./parsers/event_expr").parser;
 const parserSymbols = require("./parsers/symbols").parser;
+const parserExpression = require("./parsers/expression").parser;
 const secureAmqp = require('../cllibsecureamqp')
 //const secureAmqp = require('secureamqp')
 
@@ -28,16 +29,16 @@ const _plan = (() => {
 
 
 function replace(s, t) {
-	console.log("Replacing: ", s)
-	if(s.indexOf('{{') == -1) {
-		return s
-	}
 	function tr(k) {
 		if(t[k]) {
 			return t[k]
 		} else {
 			return k
 		}
+	}
+	console.log("Replacing: ", s)
+	if(s.indexOf('{{') == -1) {
+		return s
 	}
 	const subSub = parserSymbols.parse(s)
 	console.log(subSub)
@@ -61,6 +62,16 @@ function replaceExpr(s, t) {
 		subStr = subStr.replace(k, dict[k])
 	})
 	return subStr
+}
+
+function extract(s) {
+		const re = new RegExp('{{(.*?)}}')
+		const r = s.match(re)
+		if(r) {
+			return r[1]
+		} else {
+			return s
+		}
 }
 
 
@@ -197,7 +208,29 @@ function newEvent(event) {
 
 function runAction(action) {
 	console.log("Running action: ", action)
+	function tr(k) {
+		const t = plan.table
+		if(t[k]) {
+			return t[k]
+		} else {
+			return k
+		}
+	}
 	action.do.forEach(t => {
+		if(t.expr) {
+			// process expression
+			console.log("EXPR: ", t.expr)
+			const lhs = extract(t.expr.split('=')[0])
+			const rhs = t.expr.split('=')[1]
+			const x = eval(parserExpression.parse(rhs))
+			addToTable(lhs, x, plan.table)
+			return
+		}
+		if(t.print) {
+			const p = replace(t.print, plan.table)
+			console.log("[PRINT " + t.print +"] " + p)
+			return
+		}
 		const f = replace(t.function, plan.table).split('.')
 		const d = f[0]
 		const fname = '.' + f[1] +'.' + f[2]
