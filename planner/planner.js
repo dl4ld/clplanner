@@ -9,13 +9,6 @@ const secureAmqp = require('../../cllibsecureamqp')
 
 const events = {}
 let plan
-/*const _plan = (() => {
-	if(options.plan) {
-		const file = fs.readFileSync(options.plan, 'utf8')
-		const p = YAML.parse(file)
-		return p
-	} else return {}
-})()*/
 
 function replace(s, t) {
 	function tr(k) {
@@ -87,6 +80,7 @@ function extract(s) {
 	}
 }*/
 
+
 function parsePlan(p) {
 	const table = p.table
 	const events = {}
@@ -100,6 +94,9 @@ function parsePlan(p) {
 		a.fired = false
 		a.firedAt = null
 		actions[a.name] = a
+		if(a.on == "_") {
+			return
+		}
 		const expandedExpr = replaceExpr(a.on, table)
 		console.log("Expanded expr: ", expandedExpr)
 		const eventExpr = parserEventExpr.parse(expandedExpr)
@@ -227,6 +224,17 @@ function runAction(action) {
 			console.log("[PRINT " + t.print +"] " + p)
 			return
 		}
+		// if action is to fire a new event
+		if(t.event) {
+			const e = t.event
+			const eventName = replace(e.eventName, plan.table)
+			const eventType = e.eventType || "String"
+			//const eventValue = replace(ret.eventValue, plan.table)
+			const eventValue = eval(parserExpression.parse(e.eventValue))
+			console.log("Emit: " + eventName + " Value: " + eventValue)	
+			secureAmqp.emitEvent(eventName, eventType, eventValue, null)
+			return
+		}
 		// if action is a function; call function over message queue
 		const f = replace(t.function, plan.table).split('.')
 		const d = f[0]
@@ -255,16 +263,15 @@ function runAction(action) {
 			if(!codes) {
 				return
 			}
-			Object.keys(codes).forEach(k => {
-				// codes e.g. 200, 400
-				const code = codes[k]
-				code.forEach(ret => {
-					const eventName = replace(ret.eventName, plan.table)
-					const eventType = ret.eventType || "String"
-					const eventValue = replace(ret.eventValue, plan.table)
-					console.log("Emit: ", eventName)	
-					secureAmqp.emitEvent(eventName, eventType, eventValue, null)
-				})
+			const resultCode = parseInt(result.status)
+			const code = codes[resultCode] || []
+			code.forEach(ret => {
+				const eventName = replace(ret.eventName, plan.table)
+				const eventType = ret.eventType || "String"
+				//const eventValue = replace(ret.eventValue, plan.table)
+				const eventValue = eval(parserExpression.parse(ret.eventValue))
+				console.log("Emit: ", eventName)	
+				secureAmqp.emitEvent(eventName, eventType, eventValue, null)
 			})
 		})
 	})
@@ -289,4 +296,7 @@ module.exports.executePlan = function(fileName) {
 			newEvent(e)
 		})
 	})
+	if(plan.actions.start) {
+		runAction(plan.actions.start)
+	}
 }

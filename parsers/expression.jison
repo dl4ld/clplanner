@@ -7,6 +7,8 @@
 \s+                   /* skip whitespace */
 [0-9]+("."[0-9]+)?\b  return 'NUMBER';
 \{\{[a-zA-Z]+\}\}     return 'VARIABLE';
+[\w\s:]+              return 'WORD';
+\'[\w\s:]+\'          return 'STRING';
 "*"                   return '*';
 "/"                   return '/';
 "-"                   return '-';
@@ -68,6 +70,10 @@ e
         {$$ = Number(yytext);}
     | VARIABLE
         {$$ = 'tr("' + yytext.substr(2, yytext.length - 4) + '")';}
+    | STRING
+        {$$ = yytext;}
+    | WORD
+        {$$ = "'" + yytext + "'";}
     | E
         {$$ = Math.E;}
     | PI

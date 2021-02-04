@@ -7,8 +7,21 @@ table:
    Data001: somehash
    A: 5
    B: 3
+   M: Mars
     
 actions:
+  - on: "_"
+    name: start
+    do:
+     - print: "{{me}}"
+     - event:
+           eventName: "{{me}}.e.start1"
+           eventType: "String"
+           eventValue: "'Hello World'"
+     - event:
+           eventName: "{{me}}.e.start2"
+           eventType: "String"
+           eventValue: "'Hello ' + {{M}}"
   - on: "E.{{EventA}}.e.codeRed || (E.{{EventA}}.e.codeOrange && E.{{EventA}}.e.codeYellow)"
     name: action1
     timeWindow: 5
@@ -36,7 +49,7 @@ actions:
                400:
                 - eventName: "{{me}}.e.error"
                   eventType: "String"
-                  eventValue: "Error from function {{AuditorA}}.f.sign"
+                  eventValue: "'Error with function ' + {{AuditorA}} + ' f sign ' + {{tokenA}}"
   - on: "E.{{me}}.e.counter > 0"
     resetAfter: 0
     name: counter1
@@ -76,5 +89,10 @@ actions:
        params:
           result: "{{resultCopy1}}"
        result: null
+  - on: "E.{{me}}.e.error"
+    name: error
+    resetAfter: 0
+    do:
+     - print: "{{{{me}}.e.error.value}}"    
 
    
