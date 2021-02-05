@@ -30,6 +30,7 @@ async function main() {
 		console.log("Function handleResult called: ", JSON.stringify(req.msg))
 	})
 
+	planner.debug(true)
 	planner.executePlan(options.plan)
 
 }

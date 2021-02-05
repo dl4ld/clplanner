@@ -84,7 +84,7 @@ performAction: function anonymous(yytext, yyleng, yylineno, yy, yystate /* actio
 var $0 = $$.length - 1;
 switch (yystate) {
 case 1:
- typeof console !== 'undefined' ? console.log($$[$0-1]) : print($$[$0-1]);
+ //typeof console !== 'undefined' ? console.log($$[$0-1]) : print($$[$0-1]);
           return $$[$0-1]; 
 break;
 case 2: case 3: case 4: case 5: case 6:

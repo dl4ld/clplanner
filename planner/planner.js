@@ -9,6 +9,17 @@ const secureAmqp = require('../../cllibsecureamqp')
 
 const events = {}
 let plan
+let DEBUG = false
+
+function log(m, v){
+	if(!DEBUG) return
+
+	console.log(m,v)
+}
+
+function print(n, p) {
+	console.log("[PRINT " + n +"] " + p)
+}
 
 function replace(s, t) {
 	function tr(k) {
@@ -18,18 +29,17 @@ function replace(s, t) {
 			return k
 		}
 	}
-	console.log("Replacing: ", s)
+	log("Replacing: ", s)
 	if(s.indexOf('{{') == -1) {
 		return s
 	}
 	const subSub = parserSymbols.parse(s)
-	console.log(subSub)
 	const x = eval(subSub)
 	return x
 }
 
 function replaceExpr(s, t) {
-	console.log("Start replace of: ", s)
+	log("Start replace of: ", s)
 	const dict = {}
 	const eventCsv = parserEventNames
 		.parse(s)
@@ -56,31 +66,6 @@ function extract(s) {
 		}
 }
 
-
-/*function _replace_(s, t) {
-	console.log("Starting replace: ", s)
-	const subStr = dig(s, t)
-	console.log("Replace " + s + " with " + subStr)
-	return subStr
-
-	function dig(s, t){
-		const re = new RegExp('{{(.*?)}}')
-		const r = s.match(re)
-		if(r) {
-			if(t[r[1]]){
-				let ns = s.replace(r[0], t[r[1]])
-				return dig(ns, t)
-			} else {
-				let ns = s.replace(r[0], "None")
-				return dig(ns, t)
-			}
-		} else {
-			return s
-		}
-	}
-}*/
-
-
 function parsePlan(p) {
 	const table = p.table
 	const events = {}
@@ -98,7 +83,7 @@ function parsePlan(p) {
 			return
 		}
 		const expandedExpr = replaceExpr(a.on, table)
-		console.log("Expanded expr: ", expandedExpr)
+		log("Expanded expr: ", expandedExpr)
 		const eventExpr = parserEventExpr.parse(expandedExpr)
 		const eventCsv = parserEventNames
 			.parse(expandedExpr)
@@ -130,16 +115,16 @@ function parsePlan(p) {
 
 
 function addToTable(k, v, t) {
-	console.log("Adding to table: ", { key: k, value: v})
+	log("Adding to table: ", { key: k, value: v})
 	t[k] = v
 }
 
 function newEvent(event) {
-	console.log("New event: ", event)
+	log("New event: ", event)
 	addToTable(event.name + ".value", event.value, plan.table) 
 
 	function evaluate(expr) {
-		console.log("Evaluating expr: ", expr)
+		log("Evaluating expr: ", expr)
 		const e = plan.triggers
 		let ev = false
 		eval("ev = (" + expr + ") ? true : false")
@@ -162,7 +147,7 @@ function newEvent(event) {
 	const listeners = plan.listeners[event.name] || []
 	listeners.forEach(l => {
 		const action = plan.actions[l.name]
-		console.log("Fired event: ", event.name)
+		log("Fired event: ", event.name)
 		if(!action.startWindow) {
 			action.startWindow = new Date().getTime()
 			if(!action.timeWindow) {
@@ -171,11 +156,11 @@ function newEvent(event) {
 		}
 
 		if(evaluate(l.expr)) {
-			console.log(action.on + " evaluates to true.")
+			log(action.on + " evaluates to true.")
 			const t1 = new Date().getTime()
 			const tDiff = t1 - action.startWindow
 			if(tDiff > (action.timeWindow * 1000)) {
-				console.log("Time window expired for event.")
+				log("Time window expired for event.")
 				action.startWindow = null
 				return
 			}
@@ -191,7 +176,7 @@ function newEvent(event) {
 				runAction(action)
 			}
 		} else {
-			// console.log(plan.triggers)
+			// log(plan.triggers)
 		}
 	})
 }
@@ -199,7 +184,7 @@ function newEvent(event) {
 
 
 function runAction(action) {
-	console.log("Running action: ", action)
+	log("Running action: ", action)
 	function tr(k) {
 		const t = plan.table
 		if(t[k] !== undefined) {
@@ -221,7 +206,7 @@ function runAction(action) {
 		// if action is print; print the variable from the symbol table
 		if(t.print) {
 			const p = replace(t.print, plan.table)
-			console.log("[PRINT " + t.print +"] " + p)
+			print(t.print, p)
 			return
 		}
 		// if action is to fire a new event
@@ -231,7 +216,7 @@ function runAction(action) {
 			const eventType = e.eventType || "String"
 			//const eventValue = replace(ret.eventValue, plan.table)
 			const eventValue = eval(parserExpression.parse(e.eventValue))
-			console.log("Emit: " + eventName + " Value: " + eventValue)	
+			log("Emit: " + eventName + " Value: " + eventValue)	
 			secureAmqp.emitEvent(eventName, eventType, eventValue, null)
 			return
 		}
@@ -248,9 +233,9 @@ function runAction(action) {
 		})
 		// call the function using the message queue 
 		// and register a callback on function return
-		console.log("Calling function: " + d + fname)
+		log("Calling function: " + d + fname)
 		secureAmqp.callFunction(d, fname, t.newParams, null, function(res) {
-			console.log("Fucntion: " + fname + " returned.")
+			log("Fucntion: " + fname + " returned.")
 			if(!t.return) {
 				return
 			}
@@ -270,7 +255,7 @@ function runAction(action) {
 				const eventType = ret.eventType || "String"
 				//const eventValue = replace(ret.eventValue, plan.table)
 				const eventValue = eval(parserExpression.parse(ret.eventValue))
-				console.log("Emit: ", eventName)	
+				log("Emit: ", eventName)	
 				secureAmqp.emitEvent(eventName, eventType, eventValue, null)
 			})
 		})
@@ -278,7 +263,7 @@ function runAction(action) {
 }
 
 function debug() {
-	console.log("Debug.......");
+	log("Debug.......");
 	newEvent({
 		name: "Y6kVMKeW16Q8oNCGqlfCr12w5jaIzaJeoC+vfZIvb24=.e.codeRed",
 		value: true,
@@ -286,17 +271,23 @@ function debug() {
 	})
 }
 
+module.exports.debug = function(s) {
+	DEBUG = s
+}
+
 module.exports.executePlan = function(fileName) {
 	const fileContents = fs.readFileSync(fileName, 'utf8')
 	const p = YAML.parse(fileContents)
 	plan = parsePlan(p)
-	Object.keys(plan.events).forEach(k => {
-		console.log("Lib Subscribing to event: ", k)
-		secureAmqp.subscribeEvent(k, function(e) {
+	Object.keys(plan.events).forEach(async k => {
+		log("Lib Subscribing to event: ", k)
+		await secureAmqp.subscribeEvent(k, function(e) {
 			newEvent(e)
 		})
 	})
-	if(plan.actions.start) {
-		runAction(plan.actions.start)
-	}
+	setTimeout(() => {
+		if(plan.actions.start) {
+			runAction(plan.actions.start)
+		}
+	}, 1000)
 }
