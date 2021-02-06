@@ -1,5 +1,7 @@
 const YAML = require('yaml')
 const fs = require('fs')
+const axios = require('axios')
+const Promise = require('bluebird')
 const parserEventNames = require("../parsers/event_names").parser;
 const parserEventExpr = require("../parsers/event_expr").parser;
 const parserSymbols = require("../parsers/symbols").parser;
@@ -182,17 +184,17 @@ function newEvent(event) {
 }
 
 
+function tr(k) {
+	const t = plan.table
+	if(t[k] !== undefined) {
+		return t[k]
+	} else {
+		return k
+	}
+}
 
 function runAction(action) {
 	log("Running action: ", action)
-	function tr(k) {
-		const t = plan.table
-		if(t[k] !== undefined) {
-			return t[k]
-		} else {
-			return k
-		}
-	}
 	action.do.forEach(t => {
 		// if action is an expression e.g. C = A + B
 		// evaulate expression and save it in symbol table
@@ -209,15 +211,42 @@ function runAction(action) {
 			print(t.print, p)
 			return
 		}
+		// if action is http; make an external http call
+		if(t.http) {
+			const h = t.http
+			const x = axios({
+				url: h.url,
+				method: h.method,
+				headers: h.headers,
+				data:h.data
+			})
+			Promise.bind(x, t)
+			x.then(response => {
+				addToTable(t.http.return.ref, response.data, plan.table)
+				// handle response codes; trigger events
+				const codes = t.http.return.codes
+				if(!codes) {
+					return
+				}
+				const resultCode = parseInt(response.status)
+				const code = codes[resultCode] || []
+				code.forEach(ret => {
+					emitEvent(ret, plan.table)
+				})
+			})
+			
+			return
+		}
 		// if action is to fire a new event
 		if(t.event) {
-			const e = t.event
+			emitEvent(t.event, plan.table)
+			/*const e = t.event
 			const eventName = replace(e.eventName, plan.table)
 			const eventType = e.eventType || "String"
 			//const eventValue = replace(ret.eventValue, plan.table)
 			const eventValue = eval(parserExpression.parse(e.eventValue))
 			log("Emit: " + eventName + " Value: " + eventValue)	
-			secureAmqp.emitEvent(eventName, eventType, eventValue, null)
+			secureAmqp.emitEvent(eventName, eventType, eventValue, null)*/
 			return
 		}
 		// if action is a function; call function over message queue
@@ -251,15 +280,24 @@ function runAction(action) {
 			const resultCode = parseInt(result.status)
 			const code = codes[resultCode] || []
 			code.forEach(ret => {
-				const eventName = replace(ret.eventName, plan.table)
+				emitEvent(ret, plan.table)
+				/*const eventName = replace(ret.eventName, plan.table)
 				const eventType = ret.eventType || "String"
 				//const eventValue = replace(ret.eventValue, plan.table)
 				const eventValue = eval(parserExpression.parse(ret.eventValue))
 				log("Emit: ", eventName)	
-				secureAmqp.emitEvent(eventName, eventType, eventValue, null)
+				secureAmqp.emitEvent(eventName, eventType, eventValue, null)*/
 			})
 		})
 	})
+}
+
+function emitEvent(e, t) {
+	const eventName = replace(e.eventName, t)
+	const eventType = e.eventType || "String"
+	const eventValue = eval(parserExpression.parse(e.eventValue))
+	log("Emit: ", eventName)	
+	secureAmqp.emitEvent(eventName, eventType, eventValue, null)
 }
 
 function debug() {

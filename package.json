@@ -10,10 +10,15 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "axios": "^0.21.1",
+    "bluebird": "^3.7.2",
     "command-line-args": "^5.1.1",
+    "https": "^1.0.0",
     "randomstring": "^1.1.5",
     "redis": "^3.0.2",
+    "request": "^2.88.2",
     "secureamqp": "git+https://github.com/dl4ld/cllibsecureamqp.git",
+    "url": "^0.11.0",
     "yaml": "^1.10.0"
   }
 }
