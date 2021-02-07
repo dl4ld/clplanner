@@ -1,15 +1,16 @@
 const YAML = require('yaml')
 const fs = require('fs')
-const axios = require('axios')
 const Promise = require('bluebird')
 const parserEventNames = require("../parsers/event_names").parser;
 const parserEventExpr = require("../parsers/event_expr").parser;
 const parserSymbols = require("../parsers/symbols").parser;
 const parserExpression = require("../parsers/expression").parser;
 const secureAmqp = require('../../cllibsecureamqp')
+const path_module = require('path')
 //const secureAmqp = require('secureamqp')
 
 const events = {}
+const moduleHolder = {}
 let plan
 let DEBUG = false
 
@@ -17,6 +18,63 @@ function log(m, v){
 	if(!DEBUG) return
 
 	console.log(m,v)
+}
+
+function loadModules(path) {
+	console.log(path)
+    fs.lstat(path, function(err, stat) {
+		if(err) {
+			log(err)
+			return
+		}
+        if (stat.isDirectory()) {
+            // we have a directory: do a tree walk
+            fs.readdir(path, function(err, files) {
+                var f, l = files.length;
+                for (var i = 0; i < l; i++) {
+                    f = path_module.join('./', path, files[i]);
+                    loadModules(f);
+                }
+            });
+        } else {
+			path = path.replace('planner/','')
+			if(path_module.extname(path) != '.js') return
+            // we have a file: load it
+            require('./' + path)(moduleHolder);
+        }
+    });
+}
+
+function runModule(name, params) {
+	const plugin = moduleHolder[name]
+	if(!plugin) {
+		console.log("no plugin: ", name)
+		return
+	}
+	const req = {
+		params: params
+	}
+	const _sendObj = function(){
+		let code = 200
+		this.status = function(s) {
+			code = s
+			return this
+		}
+		this.send = function(d) {
+			console.log("do sendy stuff with status: ", code)
+		}
+	}
+
+	const sendObj = new _sendObj()
+	plugin(req, sendObj)
+}
+
+function watchModules(path) {
+	fs.watch(path, (event, who) => {
+		if (event != 'change') return
+		f = path + '/' + who
+		loadModules(f)
+	})
 }
 
 function print(n, p) {
@@ -196,6 +254,42 @@ function tr(k) {
 function runAction(action) {
 	log("Running action: ", action)
 	action.do.forEach(t => {
+		// check if a plugin exists for the action
+		Object.keys(t).forEach(name => {
+			const plugin = moduleHolder[name]
+			if(!plugin) {
+				return
+			}
+			const sendObj = function(){
+				this.resultCode = 200
+				this.action = t[name]
+				this.table = plan.table
+				this.status = function(code) {
+					this.resultCode = code
+					return this
+				}
+				this.send = function(data) {
+					if(!this.action.return) {
+						return
+					}
+
+					addToTable(this.action.return.ref, data, this.table)
+					// handle response codes; trigger events
+					const codes = this.action.return.codes
+					if(!codes) {
+						return
+					}
+					const code = codes[this.resultCode] || []
+					code.forEach(ret => {
+						emitEvent(ret, this.table)
+					})
+				}
+			}
+
+			log("Calling plugin: ", name)
+			log("Params: ", t.http)
+			plugin(t, new sendObj())
+		})
 		// if action is an expression e.g. C = A + B
 		// evaulate expression and save it in symbol table
 		if(t.expr) {
@@ -211,32 +305,6 @@ function runAction(action) {
 			print(t.print, p)
 			return
 		}
-		// if action is http; make an external http call
-		if(t.http) {
-			const h = t.http
-			const x = axios({
-				url: h.url,
-				method: h.method,
-				headers: h.headers,
-				data:h.data
-			})
-			Promise.bind(x, t)
-			x.then(response => {
-				addToTable(t.http.return.ref, response.data, plan.table)
-				// handle response codes; trigger events
-				const codes = t.http.return.codes
-				if(!codes) {
-					return
-				}
-				const resultCode = parseInt(response.status)
-				const code = codes[resultCode] || []
-				code.forEach(ret => {
-					emitEvent(ret, plan.table)
-				})
-			})
-			
-			return
-		}
 		// if action is to fire a new event
 		if(t.event) {
 			emitEvent(t.event, plan.table)
@@ -250,45 +318,48 @@ function runAction(action) {
 			return
 		}
 		// if action is a function; call function over message queue
-		const f = replace(t.function, plan.table).split('.')
-		const d = f[0]
-		const fname = '.' + f[1] +'.' + f[2]
-		// translate parameter variables and store in new object so
-		// that parameters can be transalted on subsequent calls
-		t.newParams = {}
-		Object.keys(t.params).forEach(k => {
-			let v = t.params[k]
-			t.newParams[k] = replace(v, plan.table)
-		})
-		// call the function using the message queue 
-		// and register a callback on function return
-		log("Calling function: " + d + fname)
-		secureAmqp.callFunction(d, fname, t.newParams, null, function(res) {
-			log("Fucntion: " + fname + " returned.")
-			if(!t.return) {
-				return
-			}
-			
-			const result = res.msg
-			// add result as reference in symbol table
-			addToTable(t.return.ref, result.response, plan.table)
-			// handle response codes; trigger events
-			const codes = t.return.codes
-			if(!codes) {
-				return
-			}
-			const resultCode = parseInt(result.status)
-			const code = codes[resultCode] || []
-			code.forEach(ret => {
-				emitEvent(ret, plan.table)
-				/*const eventName = replace(ret.eventName, plan.table)
-				const eventType = ret.eventType || "String"
-				//const eventValue = replace(ret.eventValue, plan.table)
-				const eventValue = eval(parserExpression.parse(ret.eventValue))
-				log("Emit: ", eventName)	
-				secureAmqp.emitEvent(eventName, eventType, eventValue, null)*/
+		if(t.function) {
+			const f = replace(t.function, plan.table).split('.')
+			const d = f[0]
+			const fname = '.' + f[1] +'.' + f[2]
+			// translate parameter variables and store in new object so
+			// that parameters can be transalted on subsequent calls
+			t.newParams = {}
+			Object.keys(t.params).forEach(k => {
+				let v = t.params[k]
+				t.newParams[k] = replace(v, plan.table)
 			})
-		})
+			// call the function using the message queue 
+			// and register a callback on function return
+			log("Calling function: " + d + fname)
+			secureAmqp.callFunction(d, fname, t.newParams, null, function(res) {
+				log("Fucntion: " + fname + " returned.")
+				if(!t.return) {
+					return
+				}
+				
+				const result = res.msg
+				// add result as reference in symbol table
+				addToTable(t.return.ref, result.response, plan.table)
+				// handle response codes; trigger events
+				const codes = t.return.codes
+				if(!codes) {
+					return
+				}
+				const resultCode = parseInt(result.status)
+				const code = codes[resultCode] || []
+				code.forEach(ret => {
+					emitEvent(ret, plan.table)
+					/*const eventName = replace(ret.eventName, plan.table)
+					const eventType = ret.eventType || "String"
+					//const eventValue = replace(ret.eventValue, plan.table)
+					const eventValue = eval(parserExpression.parse(ret.eventValue))
+					log("Emit: ", eventName)	
+					secureAmqp.emitEvent(eventName, eventType, eventValue, null)*/
+				})
+			})
+			return
+		}
 	})
 }
 
@@ -314,11 +385,12 @@ module.exports.debug = function(s) {
 }
 
 module.exports.executePlan = function(fileName) {
+	loadModules('./planner/plugins')
 	const fileContents = fs.readFileSync(fileName, 'utf8')
 	const p = YAML.parse(fileContents)
 	plan = parsePlan(p)
 	Object.keys(plan.events).forEach(async k => {
-		log("Lib Subscribing to event: ", k)
+		log("Subscribing to event: ", k)
 		await secureAmqp.subscribeEvent(k, function(e) {
 			newEvent(e)
 		})
