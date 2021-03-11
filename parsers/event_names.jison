@@ -3,10 +3,10 @@
 
 /* lexical grammar */
 %lex
+%options flex
 %%
 
 \s+							/* skip whitespace */
-E\.[a-zA-Z0-9{}.+/=]+		return 'EVENTNAME'
 [+-]?([0-9]*[.])?[0-9]+     return 'NUMBER'
 "||"						return '||'
 "&&"						return '&&'
@@ -22,6 +22,7 @@ E\.[a-zA-Z0-9{}.+/=]+		return 'EVENTNAME'
 "["							return '['
 "]"							return ']'
 "..."							return '...'
+[a-zA-Z0-9{}.+/=]+		    return 'EVENTNAME'
 <<EOF>>						return 'EOF'
 .							return 'INVALID'
 

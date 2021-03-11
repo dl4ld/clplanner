@@ -8,6 +8,24 @@ table:
 actions:
   - on: "_"
     name: start
+    expect:
+     - from: "{{AuditorA}}.p.obligationA"
+       timeWindow: 60
+       validate:
+           - myFunc:
+               data: "{{{{AuditorA}}.p.obligationA.value}}"
+               return:
+                   ref: validatetionA
+                   codes:
+                        resolve:
+                          - eventName: "{{me}}.e.end"
+                            eventType: "Object"
+                            eventValue: "{{resultA}}"
+                        reject:
+                          - eventName: "{{me}}.e.end"
+                            eventType: "Object"
+                            eventValue: "{{resultA}}"
+         
     do:
      - print: "{{me}}"
      - event:

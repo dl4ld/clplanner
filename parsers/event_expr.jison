@@ -3,27 +3,28 @@
 
 /* lexical grammar */
 %lex
+%options flex
 %%
 
 \s+                   /* skip whitespace */
-E\.[a-zA-Z0-9=.+/]+	  return 'EVENTNAME'
-[+-]?([0-9]*[.])?[0-9]+     return 'NUMBER'
-"||"                  return '||'
-"&&"                  return '&&'
-"!"                   return '!'
-"=="                  return '=='
-"<>"				  return '<>'
-">="                  return '>='
-"<="                  return '<='
-"<"                   return '<'
-">"                   return '>'
-"("                   return '('
-")"                   return ')'
-"["                   return '['
-"]"                   return ']'
-"..."                 return '...'
-<<EOF>>               return 'EOF'
-.                     return 'INVALID'
+[+-]?([0-9]*[.])?[0-9]+			return 'NUMBER'
+"..."							return '...'
+"||"							return '||'
+"&&"							return '&&'
+"!"								return '!'
+"=="							return '=='
+"<>"							return '<>'
+">="							return '>='
+"<="							return '<='
+"<"								return '<'
+">"								return '>'
+"("								return '('
+")"								return ')'
+"["								return '['
+"]"								return ']'
+[a-zA-Z0-9]+[a-zA-Z0-9=.+/]*	return 'EVENTNAME'
+<<EOF>>							return 'EOF'
+.								return 'INVALID'
 
 /lex
 
@@ -58,7 +59,7 @@ COMP
 
 EV
     : EVENTNAME
-         {$$ = yytext.substring(2, yytext.lenght);}
+         {$$ = yytext.substring(0, yytext.lenght);}
 	;
 
 e

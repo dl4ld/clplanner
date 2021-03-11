@@ -1,6 +1,7 @@
 const YAML = require('yaml')
 const fs = require('fs')
 const Promise = require('bluebird')
+const Redis = require('redis')
 const parserEventNames = require("../parsers/event_names").parser;
 const parserEventExpr = require("../parsers/event_expr").parser;
 const parserSymbols = require("../parsers/symbols").parser;
@@ -12,7 +13,8 @@ const path_module = require('path')
 const events = {}
 const moduleHolder = {}
 let plan
-let DEBUG = false
+let redis
+let DEBUG = true
 
 function log(m, v){
 	if(!DEBUG) return
@@ -148,8 +150,7 @@ function parsePlan(p) {
 		const eventCsv = parserEventNames
 			.parse(expandedExpr)
 			.split(',')
-			.forEach(ee => {
-				e = ee.substr(2, ee.lenght)
+			.forEach(e => {
 				events[e] = e
 				triggers[e] = {
 					type: null,
@@ -179,8 +180,21 @@ function addToTable(k, v, t) {
 	t[k] = v
 }
 
+function addToDb(event) {
+		log("Add to db", event)
+		const e = {
+			iat: event.iat,
+			type: event.type,
+			value: event.value
+		}
+		redis.lpush(event.name, [JSON.stringify(e)],  () => {
+			//log("")
+		})
+}
+
 function newEvent(event) {
 	log("New event: ", event)
+	addToDb(event)
 	addToTable(event.name + ".value", event.value, plan.table) 
 
 	function evaluate(expr) {
@@ -384,14 +398,53 @@ module.exports.debug = function(s) {
 	DEBUG = s
 }
 
+module.exports.init = async function(config) {
+
+	function initRedis(c)  {
+		config = c
+		return new Promise((resolve, reject) => {
+			redis = Redis.createClient({
+				host: config.host || "127.0.0.1",
+				port: config.port || 6379
+			})
+			redis.on("ready", () => {
+				resolve()
+			})
+			redis.on("error", (err) => {
+				reject(err)
+			})
+		})
+	}
+	
+	if(config.redis) {
+		await initRedis(config.redis)
+		log("Init redis OK.")
+	}
+
+}
+
+function addE(rk) {
+	const p = rk.split('.')
+	p[0] = p[0] +'.e'
+	return p.join('.')
+}
+
+function delE(rk) {
+	return rk.replace('.e.','.')
+}
+
 module.exports.executePlan = function(fileName) {
 	loadModules('./planner/plugins')
-	const fileContents = fs.readFileSync(fileName, 'utf8')
-	const p = YAML.parse(fileContents)
+	//const fileContents = fs.readFileSync(fileName, 'utf8')
+	//const p = YAML.parse(fileContents)
+	const p = require(fileName)
 	plan = parsePlan(p)
 	Object.keys(plan.events).forEach(async k => {
-		log("Subscribing to event: ", k)
-		await secureAmqp.subscribeEvent(k, function(e) {
+		const rk = addE(k)
+
+		log("Subscribing to event: ", rk)
+		await secureAmqp.subscribeEvent(rk, function(e) {
+			e.name = delE(e.name)
 			newEvent(e)
 		})
 	})
