@@ -35,14 +35,19 @@ async function main() {
 		const plannerAddress = planner.id()
 		console.log("Actor address: ", plannerAddress)
 
+		// listen to events from other actors and react to them
 	    planner.listen("codeRed", function(event) {
 			console.log("Received event: ", event)
+			// create an operation definition for the auditor to sign
+			const op  = planner.createOperationRequestDefinition(t.bucketA, 'copy', 'function', {})
+			// ask auditor actor to sign the operation definition
+			const token = await planner.actor(t.auditorA).sign(op)
+			console.log("Received token: ", token)
+			// use token from auditor as an authorization call 'send' function on bucketA actor
+			const res = await planner.actor(t.bucketA).call('send', token, { some: 'thing'})
+			console.log(res)
 		})
-		const op  = planner.createOperationRequestDefinition(t.bucketA, 'copy', 'function', {})
-		const token = await planner.actor(t.auditorA).sign(op)
-		console.log("Received token: ", token)
-		const res = await planner.actor(t.bucketA).call('send', token, { some: 'thing'})
-		console.log(res)
+
 }
 
 main()
