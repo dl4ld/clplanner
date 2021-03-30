@@ -36,15 +36,28 @@ async function main() {
 		console.log("Actor address: ", plannerAddress)
 
 		// listen to events from other actors and react to them
-	    planner.listen("codeRed", function(event) {
+	    planner.listenToEvent("codeRed", async function(event) {
 			console.log("Received event: ", event)
+			// request asset manifests from actor
+			const manifests = await planner.talkToActor(t.bucketA).requestAllManifests()
+			console.log("All manifests: ", manifests)
+			// request manifest of one asset
+			const manifestMyData = await planner.talkToActor(t.bucketA).requestManifest('myData')
+			console.log("myData: ", manifestMyData)
+			// request information about abilities
+			const abilities = await planner.talkToActor(t.bucketA).requestAllAbilities()
+			console.log("All abilities: ", abilities)
 			// create an operation definition for the auditor to sign
-			const op  = planner.createOperationRequestDefinition(t.bucketA, 'copy', 'function', {})
-			// ask auditor actor to sign the operation definition
-			const token = await planner.actor(t.auditorA).sign(op)
+			const op  = planner.createOperationRequestDefinition(t.bucketA, 'myData', 'data', {})
+			// ask auditor actor to sign the operation definition for a limited time
+			const token = await planner.talkToActor(t.auditorA).requestSignature(op, 1)
 			console.log("Received token: ", token)
 			// use token from auditor as an authorization call 'send' function on bucketA actor
-			const res = await planner.actor(t.bucketA).call('send', token, { some: 'thing'})
+			//const res = await planner.talkToActor(t.bucketA).requestAsset('myData', token)
+			const res = await planner.talkToActor(t.bucketA).interestInAsset('myData', token, function(res) {
+				console.log("data update: ", res.msg)
+			})
+			//const res = await planner.talkToActor(t.bucketA).call('send', token, { some: 'thing'})
 			console.log(res)
 		})
 
