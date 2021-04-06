@@ -33,7 +33,10 @@ async function main() {
 		const planner = new Actor(config)
 		await planner.boot()
 		const plannerAddress = planner.id()
+		const plannerKey = planner.privateKey()
 		console.log("Actor address: ", plannerAddress)
+		console.log("Actor private key: ", plannerKey)
+
 
 		// listen to events from other actors and react to them
 	    planner.listenToEvent("codeRed", async function(event) {
